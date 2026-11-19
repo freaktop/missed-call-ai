@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Business {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  responseMessage  String   @default("Hi! Sorry we missed your call. This is {{business_name}}. How can we help? You can reply here or book an appointment: {{booking_url}}.")
+  bookingUrl       String?
+  cooldownHours    Int      @default(24)
+  quietHoursStart  Int?
+  quietHoursEnd    Int?
+  enabled          Boolean  @default(true)
+  twilioPhone      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  admins           BusinessAdmin[]
+  missedCalls      MissedCall[]
+  messages         TextMessage[]
+  optOuts          OptOut[]
+}
+
+model BusinessAdmin {
+  id           String   @id @default(cuid())
+  businessId   String
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+model MissedCall {
+  id          String   @id @default(cuid())
+  businessId  String
+  callerPhone String
+  callSid     String   @unique
+  status      String
+  createdAt   DateTime @default(now())
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  messages    TextMessage[]
+}
+
+model TextMessage {
+  id           String   @id @default(cuid())
+  businessId   String
+  missedCallId String?
+  toPhone      String
+  fromPhone    String
+  body         String
+  status       String   @default("pending")
+  providerId   String?
+  error        String?
+  sentAt       DateTime?
+  createdAt    DateTime @default(now())
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  missedCall   MissedCall? @relation(fields: [missedCallId], references: [id], onDelete: SetNull)
+}
+
+model OptOut {
+  id         String   @id @default(cuid())
+  businessId String
+  phone      String
+  createdAt  DateTime @default(now())
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([businessId, phone])
+}
+
+model WebhookEvent {
+  id             String   @id @default(cuid())
+  businessId     String?
+  source         String
+  eventType      String
+  idempotencyKey String   @unique
+  payload        Json
+  status         String   @default("received")
+  error          String?
+  createdAt      DateTime @default(now())
+  processedAt    DateTime?
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  businessId String?
+  action     String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+}
