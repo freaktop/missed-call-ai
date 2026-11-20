@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyTwilioSignature, isQuietHours, renderMessage } from "@/lib/twilio";
+import { sendBirdSms } from "@/lib/bird";
 
 const AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || "";
 
@@ -67,32 +68,30 @@ export async function POST(req: NextRequest) {
     return new NextResponse("OK", { status: 200 });
   }
 
-  // send SMS via Twilio
+  // send SMS via Bird
   const body = renderMessage(business.responseMessage, {
     business_name: business.name,
     booking_url: business.bookingUrl || "",
   });
 
-  const sid = process.env.TWILIO_ACCOUNT_SID;
-  const token = process.env.TWILIO_AUTH_TOKEN;
-  const fromPhone = process.env.TWILIO_PHONE_NUMBER || business.twilioPhone || "";
+  const fromPhone = process.env.BIRD_PHONE_NUMBER || business.twilioPhone || "";
 
   let status_msg = "failed";
   let providerId: string | undefined;
   let error: string | undefined;
 
   try {
-    const url = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`;
-    const auth = Buffer.from(`${sid}:${token}`).toString("base64");
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ To: from, From: fromPhone, Body: body }).toString(),
+    const result = await sendBirdSms({
+      to: from,
+      from: fromPhone,
+      text: body,
+      category: "transactional",
     });
-    const json = await res.json();
-    if (res.ok) { status_msg = "sent"; providerId = json.sid; }
-    else { error = json.message || "twilio_error"; }
+    status_msg = result.error ? "failed" : "sent";
+    providerId = result.error ? undefined : result.providerId;
+    error = result.error;
   } catch (e: any) {
+    status_msg = "failed";
     error = e?.message;
   }
 

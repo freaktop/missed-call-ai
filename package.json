@@ -19,6 +19,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@messagebird/sdk": "^0.146.0",
     "@prisma/client": "^5.22.0",
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
